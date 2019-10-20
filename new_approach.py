@@ -7,6 +7,41 @@ import os
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 
+
+def get_camera_calibration_parameters():
+    save_dir = os.path.join(DIR_PATH, "output_images/undistorted")
+    if not os.path.isdir(save_dir):
+        os.makedirs(save_dir)
+    # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+    objp = np.zeros((6 * 9, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)
+
+    # Arrays to store object points and image points from all the images.
+    objpoints = []  # 3d points in real world space
+    imgpoints = []  # 2d points in image plane.
+
+    images = glob.glob(DIR_PATH + '/camera_cal/*calibration*.jpg')
+    # Step through the list and search for chessboard corners
+    for fname in images:
+        img = cv2.imread(fname)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # Find the chessboard corners
+        ret, corners = cv2.findChessboardCorners(gray, (9, 6), None)
+
+        # If found, add object points, image points
+        if ret == True:
+            objpoints.append(objp)
+            imgpoints.append(corners)
+
+            # Draw and display the corners
+            # img = cv2.drawChessboardCorners(img, (9,6), corners, ret)
+            # cv2.imshow('img',img)
+            # cv2.waitKey(500)
+
+    return cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
+
+
 def moving_avg(x, n):
     mv = np.convolve(x, np.ones(n) / n, mode='valid')
     return np.concatenate(([0 for k in range(n - 1)], mv))
@@ -133,28 +168,29 @@ def fit_polynomial(binary_warped):
     leftx, lefty, rightx, righty, out_img = find_lane_pixels(binary_warped)
     ym_per_pix = 30 / 720  # meters per pixel in y dimension
     xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
-    leftx = int(leftx *xm_per_pix)
-    lefty = int(lefty *ym_per_pix)
-    rightx = int(rightx *xm_per_pix)
-    righty = int(righty *ym_per_pix)
+    # leftx = np.array(leftx *xm_per_pix, dtype='int')
+    # lefty = np.array(lefty *ym_per_pix, dtype='int')
+    # rightx = np.array(rightx *xm_per_pix,dtype='int')
+    # righty = np.array(righty *ym_per_pix,dtype='int')
     ### TO-DO: Fit a second order polynomial to each using `np.polyfit` ###
     left_fit = np.polyfit(lefty, leftx,2)
     right_fit = np.polyfit(righty, rightx,2)
 
     # Generate x and y values for plotting
     #ploty = np.linspace(0, binary_warped.shape[0] - 1, binary_warped.shape[0])
-    ploty = np.linspace(0, 1299, num=1300)
+    ploty = np.linspace(0, 1299 * ym_per_pix, num=1300 * ym_per_pix)
+    ploty = np.linspace(0, 1299 , num=1300 )
 
     y_eval = np.max(ploty) #TODO move below
 
     try:
-        left_fitx = (xm_per_pix / (ym_per_pix**2)) * left_fit[0] * ploty ** 2 + (xm_per_pix /ym_per_pix) * left_fit[1] * ploty + left_fit[2] * xm_per_pix
-        right_fitx = (xm_per_pix / (ym_per_pix**2)) * right_fit[0] * ploty ** 2 + (xm_per_pix /ym_per_pix) * right_fit[1] * ploty + right_fit[2]* xm_per_pix
-        left= left_fit[0] * ploty ** 2 +  left_fit[1] * ploty + left_fit[2]
-        right = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
-        left_curverad_Test = calc_curvature(left, y_eval)
-        right_curverad_test = calc_curvature(right, y_eval)
-        print(left_curverad_Test, right_curverad_test )
+        #left_fitx = (xm_per_pix / (ym_per_pix**2)) * left_fit[0] * ploty ** 2 + (xm_per_pix /ym_per_pix) * left_fit[1] * ploty + left_fit[2] * xm_per_pix
+        #right_fitx = (xm_per_pix / (ym_per_pix**2)) * right_fit[0] * ploty ** 2 + (xm_per_pix /ym_per_pix) * right_fit[1] * ploty + right_fit[2]* xm_per_pix
+        left_fitx= left_fit[0] * ploty ** 2 +  left_fit[1] * ploty + left_fit[2]
+        right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+        #left_curverad_Test = calc_curvature(left, y_eval)
+        #right_curverad_test = calc_curvature(right, y_eval)
+        #print(left_curverad_Test, right_curverad_test )
     except TypeError:
         # Avoids an error if `left` and `right_fit` are still none or incorrect
         print('The function failed to fit a line!')
@@ -167,8 +203,8 @@ def fit_polynomial(binary_warped):
     out_img[righty, rightx] = [0, 0, 255]
 
     # Plots the left and right polynomials on the lane lines
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
+    #plt.plot(left_fitx, ploty, color='yellow')
+    #plt.plot(right_fitx, ploty, color='yellow')
 
     y_eval = np.max(ploty)
 
@@ -179,7 +215,7 @@ def fit_polynomial(binary_warped):
 
     print(left_curverad, right_curverad)
 
-    return out_img
+    return left_fitx, right_fitx, ploty
 
 def extract_edges(image):
     #gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
@@ -218,7 +254,7 @@ def warp_image(img):
     warped = cv2.warpPerspective(img, M, (width, height), flags=cv2.INTER_LINEAR)
 
 
-    return warped
+    return warped, M
 
 def calc_curvature(polynomial, y):
 
@@ -226,21 +262,61 @@ def calc_curvature(polynomial, y):
 
     return (1+ (2*polynomial[0]*y + polynomial[1])**2)**(3/2)/(2*abs(polynomial[0]))
 
-images = glob.glob(DIR_PATH + '/test_images/*.jpg')
-for fname in images:
-    image = mpimg.imread(fname)
-    cv2.imshow('raw',image)
-    image = extract_edges(image)
-    cv2.imshow('egdes',image)
+ret, mtx, dist, rvecs, tvecs = get_camera_calibration_parameters()
 
-    binary_warped = warp_image(image)
+def process_image(img):
+    # TODO indistort
+    #undist = mpimg.imread(fname)
+    # cv2.imshow('raw',undist)
+    undist = cv2.undistort(img, mtx, dist, None, mtx)
+    image = extract_edges(undist)
+    # cv2.imshow('egdes',image)
 
-    #cv2.waitKey()
+    binary_warped, M = warp_image(image)
 
-    out_img = fit_polynomial(binary_warped)
+    # cv2.waitKey()
+
+    left_fitx, right_fitx, ploty = fit_polynomial(binary_warped)
+
+    # Create an image to draw the lines on
+    warp_zero = np.zeros_like(binary_warped).astype(np.uint8)
+    color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+
+    # Recast the x and y points into usable format for cv2.fillPoly()
+    pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
+    pts = np.hstack((pts_left, pts_right))
+
+    # Draw the lane onto the warped blank image
+    cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+
+    # Warp the blank back to original image space using inverse perspective matrix (Minv)
+    Minv = np.linalg.inv(M)
+    newwarp = cv2.warpPerspective(color_warp, Minv, (image.shape[1], image.shape[0]))
+    # Combine the result with the original image
+    result = cv2.addWeighted(undist, 1, newwarp, 0.3, 0)
+    return result
+
+def test_image():
+    images = glob.glob(DIR_PATH + '/test_images/*.jpg')
+    for fname in images:
+        image = mpimg.imread(fname)
+        result = process_image(image)
+        plt.imshow(result)
+
+        plt.show()
+# Import everything needed to edit/save/watch video clips
+from moviepy.editor import VideoFileClip
+from IPython.display import HTML
 
 
-
-
-    plt.imshow(out_img)
-    plt.show()
+def test_video():
+    white_output = 'project_video.mp4'
+    ## To speed up the testing process you may want to try your pipeline on a shorter subclip of the video
+    ## To do so add .subclip(start_second,end_second) to the end of the line below
+    ## Where start_second and end_second are integer values representing the start and end of the subclip
+    ## You may also uncomment the following line for a subclip of the first 5 seconds
+    ##clip1 = VideoFileClip("test_videos/solidWhiteRight.mp4").subclip(0,5)
+    clip1 = VideoFileClip("test_videos/project_video.mp4")
+    white_clip = clip1.fl_image(process_image)  # NOTE: this function expects color images!!
+    white_clip.write_videofile(white_output, audio=False)
