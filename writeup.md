@@ -57,6 +57,7 @@ To demonstrate this step, I will describe how I apply the distortion correction.
 
 I used a combination of color thresholds on RGB and HLS color space to generate a binary image (full implementation in in `advanced_line_finding.py` in function `extract_edges()` ).  Here's an example of my output for this step.  (note: this is not actually from one of the test images)
 
+To get the working thresholds I've used modified version of [opencv-gui-helper-tool](https://github.com/maunesh/opencv-gui-helper-tool)
 ```python
     binary_red[(R > 200) & (R <= 255)] = 255
     binary_green[(G > 200) & (G <= 255)] = 255
