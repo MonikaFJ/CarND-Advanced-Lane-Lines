@@ -101,7 +101,10 @@ I verified that my perspective transform was working as expected by drawing the 
 
 Input to the pixel identification function is the binary warped image. 
 
-There are two different techniques that I used to detect the line pixels. First one is used when there is no prior knowleadge about the position of the line.  The process consist of following steps:
+There are two different techniques that I used to detect the line pixels. 
+
+##### No prior knowledge about the position of the line
+First one is used when there is no prior knowleadge about the position of the line.  The process consist of following steps:
 1. Create histogram from the bottom of the picture and identify the peaks to find where the lines start. I decided to additionally use smoothing to get better results.
 1. Split image into 9 segments, in each segments look for line pixels that are within the region of interest originating from the average position of pixels detected in previous segment (in case of the first segment it originates from histogram peaks) (see image below) If there is not enough valid pixels in the segment, the next segment will be detected with histogram. 
 
@@ -110,6 +113,7 @@ There are two different techniques that I used to detect the line pixels. First 
 
 The full implementation can be found in function `find_lane_pixels_binary()`.
 
+##### Line was previously detected
 Second technique assumes that the approximate position of the line is known, in our case by taking the last detected polynomial. Here the idea is quite simple: all line pixels within +/- 100 pixel in x direction from the lina are marked as line pixels.  The full implementation can be found in function `find_line_pixels_around_poly()`. 
 
   
